@@ -3,8 +3,8 @@
 Public agent skills for Sawmills workflows.
 
 This repo is the canonical public source for skills that are useful outside a
-single product repository. Product-specific code and release artifacts should
-link here instead of vendoring skill copies.
+single app repository. App-specific code and release artifacts should link here
+instead of vendoring skill copies.
 
 ## Included Skills
 
@@ -29,6 +29,7 @@ npx skills add Sawmills/skills/customer-knowledge-curation -y
 skills/
   customer-knowledge-curation/
     SKILL.md
+    references/
 scripts/
   validate-skills
 ```
@@ -44,4 +45,3 @@ ruby scripts/validate-skills.test.rb
 
 The validator checks skill layout, frontmatter, required fields, and common
 public-repo privacy hazards.
-

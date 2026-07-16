@@ -1,20 +1,41 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
+require "pathname"
+require "set"
 require "yaml"
 
 class SkillValidator
   FRONTMATTER = /\A---\n(.*?)\n---\n/m
-  ORG_ID = /\borg_[A-Za-z0-9]+\b/
+  MARKDOWN_LINK = /\[[^\]]+\]\(([^)#]+\.md)(?:#[^)]+)?\)/
+  NAME = /\A[a-z0-9]+(?:-[a-z0-9]+)*\z/
+  MAX_SKILL_LINES = 500
+  ALLOWED_FRONTMATTER = %w[name description].freeze
+  PRIVATE_PATTERNS = {
+    "private org identifier" => /\borg_[A-Za-z0-9]+\b/,
+    "internal ticket identifier" => /\bSAW-\d+\b/,
+    "private customer name" => /BigID/i,
+    "private secret name" => /curator-secrets/i,
+    "Linear URL" => %r{linear\.app}i,
+    "internal CLI repository URL" => %r{github\.com/Sawmills/sawmills-cli}i,
+    "private bootstrap workflow detail" => /bootstrap/i,
+    "private production shorthand" => /\bprod\b/i,
+    "local helper command detail" => /\bpup\b/i,
+    "private curator pod detail" => /curator pod/i
+  }.freeze
+
+  COLLECTION_CONDITIONS_GET = /GET\s+\/api\/conditions(?:\s|`|$)/
+  CONDITIONS_PUT = /PUT\s+\/api\/conditions/
 
   def initialize(root)
-    @root = root
+    @root = Pathname.new(root).expand_path
     @errors = []
   end
 
   def run
     validate_markdown_locations
     skill_paths.each { |path| validate_skill(path) }
+    validate_supporting_markdown
     report
   end
 
@@ -23,21 +44,47 @@ class SkillValidator
   attr_reader :root, :errors
 
   def validate_markdown_locations
-    Dir.glob(File.join(root, "skills", "*.md")).sort.each do |path|
+    Dir.glob(root.join("skills", "*.md")).sort.each do |path|
       add_error(path, "skills must live at skills/<name>/SKILL.md")
     end
   end
 
   def skill_paths
-    Dir.glob(File.join(root, "skills", "*", "SKILL.md")).sort
+    Dir.glob(root.join("skills", "*", "SKILL.md")).sort
+  end
+
+  def skill_dirs
+    Dir.glob(root.join("skills", "*")).select { |path| File.directory?(path) }.sort
+  end
+
+  def skill_markdown_paths
+    Dir.glob(root.join("skills", "**", "*.md")).sort
   end
 
   def validate_skill(path)
     body = File.read(path)
     frontmatter = parse_frontmatter(path, body)
     validate_required_fields(path, frontmatter)
-    validate_name_matches_directory(path, frontmatter)
+    validate_frontmatter_keys(path, frontmatter)
+    validate_name(path, frontmatter)
+    validate_description(path, frontmatter)
+    validate_skill_length(path, body)
     validate_public_content(path, body)
+    validate_conditions_api_semantics(path, body)
+    validate_reference_links(path, body)
+  end
+
+  def validate_supporting_markdown
+    skill_markdown_paths.each do |path|
+      next if File.basename(path) == "SKILL.md"
+
+      body = File.read(path)
+      validate_public_content(path, body)
+      validate_conditions_api_semantics(path, body)
+      validate_no_nested_reference_links(path, body)
+    end
+
+    skill_dirs.each { |dir| validate_all_references_linked(dir) }
   end
 
   def parse_frontmatter(path, body)
@@ -56,15 +103,91 @@ class SkillValidator
     add_error(path, "missing description") if blank?(frontmatter["description"])
   end
 
-  def validate_name_matches_directory(path, frontmatter)
+  def validate_frontmatter_keys(path, frontmatter)
+    return unless frontmatter
+
+    extra_keys = frontmatter.keys - ALLOWED_FRONTMATTER
+    return if extra_keys.empty?
+
+    add_error(path, "frontmatter supports only name and description")
+  end
+
+  def validate_name(path, frontmatter)
     return unless frontmatter && frontmatter["name"]
 
+    name = frontmatter["name"]
     expected = File.basename(File.dirname(path))
-    add_error(path, "name must match directory #{expected}") unless frontmatter["name"] == expected
+    add_error(path, "name must match directory #{expected}") unless name == expected
+    add_error(path, "name must be lowercase letters, numbers, and hyphens") unless name.match?(NAME)
+  end
+
+  def validate_description(path, frontmatter)
+    return unless frontmatter && frontmatter["description"]
+
+    description = frontmatter["description"].to_s
+    add_error(path, "description must start with 'Use when'") unless description.start_with?("Use when")
+    add_error(path, "description must be 1024 characters or fewer") if description.length > 1024
+  end
+
+  def validate_skill_length(path, body)
+    lines = body.lines.count
+    return if lines <= MAX_SKILL_LINES
+
+    add_error(path, "SKILL.md must be #{MAX_SKILL_LINES} lines or fewer")
   end
 
   def validate_public_content(path, body)
-    add_error(path, "private org identifier found") if body.match?(ORG_ID)
+    PRIVATE_PATTERNS.each do |message, pattern|
+      add_error(path, message) if body.match?(pattern)
+    end
+  end
+
+  def validate_conditions_api_semantics(path, body)
+    add_error(path, "collection GET /api/conditions is not an authoring step") if body.match?(COLLECTION_CONDITIONS_GET)
+    add_error(path, "PUT /api/conditions is not part of this skill workflow") if body.match?(CONDITIONS_PUT)
+  end
+
+  def validate_reference_links(path, body)
+    links = markdown_links(body)
+    links.each do |link|
+      validate_relative_reference_link(path, link)
+    end
+  end
+
+  def validate_relative_reference_link(path, link)
+    return add_error(path, "markdown reference links must be relative") if link.start_with?("/", "../")
+
+    segments = link.split("/")
+    add_error(path, "reference links should be at most one directory deep") if segments.length > 2
+
+    full_path = File.expand_path(File.join(File.dirname(path), link))
+    skill_dir = File.expand_path(File.dirname(path))
+    return add_error(path, "markdown reference escapes skill directory") unless full_path.start_with?("#{skill_dir}/")
+
+    add_error(path, "missing referenced file #{link}") unless File.file?(full_path)
+  end
+
+  def validate_no_nested_reference_links(path, body)
+    markdown_links(body).each do |link|
+      next if link.start_with?("http://", "https://")
+
+      add_error(path, "reference files must not link to other markdown files; link from SKILL.md instead")
+    end
+  end
+
+  def validate_all_references_linked(dir)
+    skill_path = File.join(dir, "SKILL.md")
+    return unless File.file?(skill_path)
+
+    skill_body = File.read(skill_path)
+    linked_paths = markdown_links(skill_body).map { |link| File.expand_path(File.join(dir, link)) }.to_set
+    reference_paths = Dir.glob(File.join(dir, "references", "*.md")).map { |path| File.expand_path(path) }
+    unlinked = reference_paths - linked_paths.to_a
+    unlinked.each { |path| add_error(path, "reference file must be linked directly from SKILL.md") }
+  end
+
+  def markdown_links(body)
+    body.scan(MARKDOWN_LINK).flatten
   end
 
   def report
@@ -80,7 +203,7 @@ class SkillValidator
   end
 
   def relative(path)
-    path.delete_prefix("#{root}/")
+    Pathname.new(path).expand_path.relative_path_from(root).to_s
   end
 
   def blank?(value)
@@ -89,4 +212,3 @@ class SkillValidator
 end
 
 exit(SkillValidator.new(Dir.pwd).run ? 0 : 1)
-
