@@ -51,8 +51,9 @@ Read these direct references as the task requires:
 - Prefer service, namespace, workload, tenant, or source-native group grain.
   Avoid pod-grain clones except for failures whose entity really is the pod
   lifecycle, such as CrashLoopBackOff.
-- Conditions must include reviewable evidence: query, lookback window, normal
-  range, observed incident or anomaly range, and threshold rationale.
+- Every condition proposal must have reviewable evidence in the handoff: query,
+  lookback window, normal range, observed incident or anomaly range, and
+  threshold rationale.
 - Do not post test-named, scratch, or experimental condition ids.
 
 ## Conditions API

@@ -224,6 +224,24 @@ class ValidateSkillsTest < Minitest::Test
     refute_predicate status, :success?
   end
 
+  def test_when_context_evidence_is_documented_then_validator_fails
+    repo = build_repo("skills/customer-knowledge-curation/SKILL.md" => valid_skill("Record details in `context.evidence`."))
+
+    stderr, status = run_validator(repo).values_at(1, 2)
+
+    assert_includes stderr, "context.evidence is not accepted by the Conditions API"
+    refute_predicate status, :success?
+  end
+
+  def test_when_evidence_json_field_is_documented_then_validator_fails
+    repo = build_repo("skills/customer-knowledge-curation/SKILL.md" => valid_skill('{ "context": { "evidence": "baseline" } }'))
+
+    stderr, status = run_validator(repo).values_at(1, 2)
+
+    assert_includes stderr, "context.evidence is not accepted by the Conditions API"
+    refute_predicate status, :success?
+  end
+
   private
 
   def build_repo(files)

@@ -26,6 +26,7 @@ class SkillValidator
 
   COLLECTION_CONDITIONS_GET = /GET\s+\/api\/conditions(?:\s|`|$)/
   CONDITIONS_PUT = /PUT\s+\/api\/conditions/
+  UNSUPPORTED_CONTEXT_EVIDENCE = /context\.evidence|\"evidence\"\s*:/
 
   def initialize(root)
     @root = Pathname.new(root).expand_path
@@ -145,6 +146,7 @@ class SkillValidator
   def validate_conditions_api_semantics(path, body)
     add_error(path, "collection GET /api/conditions is not an authoring step") if body.match?(COLLECTION_CONDITIONS_GET)
     add_error(path, "PUT /api/conditions is not part of this skill workflow") if body.match?(CONDITIONS_PUT)
+    add_error(path, "context.evidence is not accepted by the Conditions API") if body.match?(UNSUPPORTED_CONTEXT_EVIDENCE)
   end
 
   def validate_reference_links(path, body)

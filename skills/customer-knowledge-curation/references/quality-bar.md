@@ -13,7 +13,7 @@
 Every condition must be grounded. Confirm metric names and labels exist before
 authoring, with no exceptions.
 
-Record evidence in `context.evidence`:
+Record evidence in the run handoff next to each proposed condition:
 
 - exact metric or query family checked;
 - lookback window;
@@ -22,7 +22,10 @@ Record evidence in `context.evidence`:
 - threshold rationale;
 - grain rationale when the grain is not obvious.
 
-An empty evidence field means "I guessed."
+Do not add custom evidence fields to API JSON. The Conditions API rejects
+unknown `context` keys. Put corroborating metric and log queries in
+`context.related_metrics` and `context.related_logs`, use `vectors_query` for
+search terms, and keep the full baseline narrative in the handoff.
 
 ## Detector Shape
 

@@ -54,11 +54,16 @@ PromQL expression.
     "related_metrics": [
       "rate(http_requests_total{service=\"checkout-api\"}[5m])"
     ],
+    "downstream": ["payment-api"],
     "likely_causes": ["bad deploy", "downstream dependency failing"],
-    "evidence": "7d baseline: error ratio 0.1-0.8% normally, observed incident peak 9%; threshold 5% sits above normal readings"
+    "vectors_query": "checkout-api 5xx error ratio bad deploy downstream failure"
   }
 }
 ```
+
+Keep baseline evidence in the run handoff next to this JSON. The API `context`
+object accepts only the fields documented below; do not add custom fields such
+as `evidence`.
 
 ## Datadog-Backed Condition
 
@@ -89,8 +94,11 @@ For Datadog-backed sources, there is no `bool_expr`; use `datadog_scalar`.
   },
   "context": {
     "component": "payment-worker",
+    "related_metrics": [
+      "min:rabbitmq.queue.consumers{rabbitmq_queue:payments.worker.queue} by {kube_namespace}"
+    ],
     "likely_causes": ["consumers crashed or disconnected"],
-    "evidence": "verified live over 7d: every namespace runs 2-5 consumers; zero never occurs during normal operation"
+    "vectors_query": "payment-worker rabbitmq consumers zero disconnected"
   }
 }
 ```
@@ -111,6 +119,10 @@ Do not guess, alias, or merge sources.
 
 Do not send server-owned fields such as `signal`, `status`, `authority`,
 `calibration`, or deployment scoping fields.
+
+Allowed `context` fields are `component`, `related_metrics`, `related_logs`,
+`upstream`, `downstream`, `likely_causes`, `runbook`, `vectors_query`, and
+`owner`. Unknown fields are rejected by the API.
 
 ## Downstream Effects
 
