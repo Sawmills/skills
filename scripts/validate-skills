@@ -1,0 +1,92 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "yaml"
+
+class SkillValidator
+  FRONTMATTER = /\A---\n(.*?)\n---\n/m
+  ORG_ID = /\borg_[A-Za-z0-9]+\b/
+
+  def initialize(root)
+    @root = root
+    @errors = []
+  end
+
+  def run
+    validate_markdown_locations
+    skill_paths.each { |path| validate_skill(path) }
+    report
+  end
+
+  private
+
+  attr_reader :root, :errors
+
+  def validate_markdown_locations
+    Dir.glob(File.join(root, "skills", "*.md")).sort.each do |path|
+      add_error(path, "skills must live at skills/<name>/SKILL.md")
+    end
+  end
+
+  def skill_paths
+    Dir.glob(File.join(root, "skills", "*", "SKILL.md")).sort
+  end
+
+  def validate_skill(path)
+    body = File.read(path)
+    frontmatter = parse_frontmatter(path, body)
+    validate_required_fields(path, frontmatter)
+    validate_name_matches_directory(path, frontmatter)
+    validate_public_content(path, body)
+  end
+
+  def parse_frontmatter(path, body)
+    match = body.match(FRONTMATTER)
+    return add_error(path, "missing YAML frontmatter") unless match
+
+    YAML.safe_load(match[1], permitted_classes: [], aliases: false) || {}
+  rescue Psych::Exception => e
+    add_error(path, "invalid YAML frontmatter: #{e.message}")
+  end
+
+  def validate_required_fields(path, frontmatter)
+    return unless frontmatter
+
+    add_error(path, "missing name") if blank?(frontmatter["name"])
+    add_error(path, "missing description") if blank?(frontmatter["description"])
+  end
+
+  def validate_name_matches_directory(path, frontmatter)
+    return unless frontmatter && frontmatter["name"]
+
+    expected = File.basename(File.dirname(path))
+    add_error(path, "name must match directory #{expected}") unless frontmatter["name"] == expected
+  end
+
+  def validate_public_content(path, body)
+    add_error(path, "private org identifier found") if body.match?(ORG_ID)
+  end
+
+  def report
+    return true if errors.empty?
+
+    errors.each { |error| warn(error) }
+    false
+  end
+
+  def add_error(path, message)
+    errors << "#{relative(path)}: #{message}"
+    nil
+  end
+
+  def relative(path)
+    path.delete_prefix("#{root}/")
+  end
+
+  def blank?(value)
+    value.nil? || value.to_s.strip.empty?
+  end
+end
+
+exit(SkillValidator.new(Dir.pwd).run ? 0 : 1)
+
