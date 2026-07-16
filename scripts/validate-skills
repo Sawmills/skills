@@ -26,7 +26,7 @@ class SkillValidator
 
   COLLECTION_CONDITIONS_GET = /GET\s+\/api\/conditions(?:\s|`|$)/
   CONDITIONS_PUT = /PUT\s+\/api\/conditions/
-  UNSUPPORTED_CONTEXT_EVIDENCE = /context\.evidence|\"evidence\"\s*:/
+  UNSUPPORTED_CONTEXT_EVIDENCE = /context\.evidence|\"context\"\s*:\s*\{[^}]*\"evidence\"\s*:/m
 
   def initialize(root)
     @root = Pathname.new(root).expand_path

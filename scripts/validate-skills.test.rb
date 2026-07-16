@@ -242,6 +242,14 @@ class ValidateSkillsTest < Minitest::Test
     refute_predicate status, :success?
   end
 
+  def test_when_unrelated_evidence_json_field_is_documented_then_validator_allows_it
+    repo = build_repo("skills/customer-knowledge-curation/SKILL.md" => valid_skill('{ "evidence": "valid for another API" }'))
+
+    status = run_validator(repo).last
+
+    assert_predicate status, :success?
+  end
+
   private
 
   def build_repo(files)
