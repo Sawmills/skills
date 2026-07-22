@@ -248,12 +248,35 @@ class ValidateSkillsTest < Minitest::Test
     refute_predicate status, :success?
   end
 
+  def test_when_unrelated_json_contains_org_then_validator_allows_it
+    body = <<~BODY
+      `POST /v1/conditions`
+      ```json
+      { "id": "checkout" }
+      ```
+
+      Unrelated response metadata:
+      ```json
+      { "org": "display-only" }
+      ```
+    BODY
+    repo = build_repo("skills/customer-knowledge-curation/SKILL.md" => valid_skill(body))
+
+    status = run_validator(repo).last
+
+    assert_predicate status, :success?
+  end
+
   def test_current_skill_documents_complete_authenticated_v1_crud
     body = File.read(File.join(REPO_ROOT, "skills/customer-knowledge-curation/SKILL.md"))
     reference = File.read(File.join(REPO_ROOT, "skills/customer-knowledge-curation/references/conditions-api.md"))
     contract = "#{body}\n#{reference}"
 
-    assert_match(%r{GET\s+/v1/conditions.*POST\s+/v1/conditions.*PUT\s+/v1/conditions/:id.*DELETE\s+/v1/conditions/:id}m, contract)
+    assert_match(%r{GET\s+/v1/conditions(?=[\s`]|$)}, contract)
+    assert_match(%r{GET\s+/v1/conditions/:id(?=[\s`]|$)}, contract)
+    assert_match(%r{POST\s+/v1/conditions(?=[\s`]|$)}, contract)
+    assert_match(%r{PUT\s+/v1/conditions/:id(?=[\s`]|$)}, contract)
+    assert_match(%r{DELETE\s+/v1/conditions/:id(?=[\s`]|$)}, contract)
     assert_match(/authenticated customer context/, contract)
     refute_match(%r{/api/conditions|/v1/conditions\?org=}, contract)
   end

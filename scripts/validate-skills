@@ -25,8 +25,8 @@ class SkillValidator
   }.freeze
 
   LEGACY_CONDITIONS_API = %r{/api/conditions}
-  V1_CONDITIONS_API = %r{/v1/conditions}
   CONDITIONS_ORG_QUERY = %r{/v1/conditions[^\s`]*[?&]org=}
+  CONDITION_REQUEST_BODY = %r{`?(?:POST|PUT)\s+/v1/conditions(?:/:id)?`?[ \t]*\r?\n(?:[ \t]*\r?\n)?[ \t]*```(?:json)?[ \t]*\r?\n(.*?)\r?\n[ \t]*```}m
   CONDITION_BODY_ORG = /"org"\s*:/
   UNSUPPORTED_CONTEXT_EVIDENCE = /context\.evidence|\"context\"\s*:\s*\{[^}]*\"evidence\"\s*:/m
 
@@ -150,7 +150,8 @@ class SkillValidator
     if body.match?(CONDITIONS_ORG_QUERY)
       add_error(path, "Conditions organization comes from authenticated context")
     end
-    if body.match?(V1_CONDITIONS_API) && body.match?(CONDITION_BODY_ORG)
+    request_bodies = body.scan(CONDITION_REQUEST_BODY).flatten
+    if request_bodies.any? { |request_body| request_body.match?(CONDITION_BODY_ORG) }
       add_error(path, "condition bodies must not select an organization")
     end
     add_error(path, "context.evidence is not accepted by the Conditions API") if body.match?(UNSUPPORTED_CONTEXT_EVIDENCE)
