@@ -26,7 +26,14 @@ class SkillValidator
 
   LEGACY_CONDITIONS_API = %r{/api/conditions}
   CONDITIONS_ORG_QUERY = %r{/v1/conditions[^\s`]*[?&]org=}
-  CONDITION_REQUEST_BODY = %r{`?(?:POST|PUT)\s+/v1/conditions(?:/:id)?`?[ \t]*\r?\n(?:[ \t]*\r?\n)?[ \t]*```(?:json)?[ \t]*\r?\n(.*?)\r?\n[ \t]*```}m
+  CONDITION_REQUEST_BODY = %r{
+    (?:
+      `?(?:POST|PUT)\s+/v1/conditions(?:/:id)?`?
+      |
+      ```http[ \t]*\r?\n(?:POST|PUT)\s+/v1/conditions(?:/:id)?[^\r\n]*\r?\n[ \t]*```
+    )
+    [ \t]*\r?\n(?:[ \t]*\r?\n)?[ \t]*```(?:json)?[ \t]*\r?\n(.*?)\r?\n[ \t]*```
+  }mx
   CONDITION_BODY_ORG = /"org"\s*:/
   UNSUPPORTED_CONTEXT_EVIDENCE = /context\.evidence|\"context\"\s*:\s*\{[^}]*\"evidence\"\s*:/m
 

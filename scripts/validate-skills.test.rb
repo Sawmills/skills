@@ -248,6 +248,23 @@ class ValidateSkillsTest < Minitest::Test
     refute_predicate status, :success?
   end
 
+  def test_when_http_fenced_condition_body_contains_org_then_validator_fails
+    body = <<~BODY
+      ```http
+      PUT /v1/conditions/:id
+      ```
+      ```json
+      { "org": "acme", "id": "checkout" }
+      ```
+    BODY
+    repo = build_repo("skills/customer-knowledge-curation/SKILL.md" => valid_skill(body))
+
+    stderr, status = run_validator(repo).values_at(1, 2)
+
+    assert_includes stderr, "condition bodies must not select an organization"
+    refute_predicate status, :success?
+  end
+
   def test_when_unrelated_json_contains_org_then_validator_allows_it
     body = <<~BODY
       `POST /v1/conditions`
@@ -278,6 +295,7 @@ class ValidateSkillsTest < Minitest::Test
     assert_match(%r{PUT\s+/v1/conditions/:id(?=[\s`]|$)}, contract)
     assert_match(%r{DELETE\s+/v1/conditions/:id(?=[\s`]|$)}, contract)
     assert_match(/authenticated customer context/, contract)
+    assert_match(/`PUT` the complete set of\s+editable fields, including intentionally unchanged ones/m, body)
     refute_match(%r{/api/conditions|/v1/conditions\?org=}, contract)
   end
 

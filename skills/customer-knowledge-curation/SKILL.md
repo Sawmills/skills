@@ -73,8 +73,9 @@ surface.
 
 The organization comes from the authenticated customer context. Never send an
 organization selector in the URL or condition body. Before an amendment, read
-the current condition, re-verify its live signal, preserve intentionally
-unchanged editable fields, and verify the write response.
+the current condition, re-verify its live signal, and `PUT` the complete set of
+editable fields, including intentionally unchanged ones, then verify the write
+response.
 
 ## Safety
 
