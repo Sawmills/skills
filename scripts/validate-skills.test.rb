@@ -198,30 +198,64 @@ class ValidateSkillsTest < Minitest::Test
     refute_predicate status, :success?
   end
 
-  def test_when_collection_conditions_get_is_documented_then_validator_fails
-    repo = build_repo("skills/customer-knowledge-curation/SKILL.md" => valid_skill("Run `GET /api/conditions` first."))
-
-    stderr, status = run_validator(repo).values_at(1, 2)
-
-    assert_includes stderr, "collection GET /api/conditions is not an authoring step"
-    refute_predicate status, :success?
-  end
-
-  def test_when_conditions_id_get_is_documented_then_validator_allows_it
-    repo = build_repo("skills/customer-knowledge-curation/SKILL.md" => valid_skill("Run `GET /api/conditions/:id` to verify."))
+  def test_when_authenticated_v1_conditions_crud_is_documented_then_validator_allows_it
+    repo = build_repo("skills/customer-knowledge-curation/SKILL.md" => valid_skill(<<~BODY))
+      `GET /v1/conditions`
+      `GET /v1/conditions/:id`
+      `POST /v1/conditions`
+      `PUT /v1/conditions/:id`
+      `DELETE /v1/conditions/:id`
+    BODY
 
     status = run_validator(repo).last
 
     assert_predicate status, :success?
   end
 
-  def test_when_conditions_put_is_documented_then_validator_fails
-    repo = build_repo("skills/customer-knowledge-curation/SKILL.md" => valid_skill("Run `PUT /api/conditions/:id`."))
+  def test_when_conditions_id_get_is_documented_then_validator_allows_it
+    repo = build_repo("skills/customer-knowledge-curation/SKILL.md" => valid_skill("Run `GET /v1/conditions/:id` to verify."))
+
+    status = run_validator(repo).last
+
+    assert_predicate status, :success?
+  end
+
+  def test_when_legacy_conditions_api_is_documented_then_validator_fails
+    repo = build_repo("skills/customer-knowledge-curation/SKILL.md" => valid_skill("Run `POST /api/conditions`."))
 
     stderr, status = run_validator(repo).values_at(1, 2)
 
-    assert_includes stderr, "PUT /api/conditions is not part of this skill workflow"
+    assert_includes stderr, "legacy /api/conditions is not customer-facing"
     refute_predicate status, :success?
+  end
+
+  def test_when_v1_conditions_query_selects_org_then_validator_fails
+    repo = build_repo("skills/customer-knowledge-curation/SKILL.md" => valid_skill("Run `GET /v1/conditions?org=acme`."))
+
+    stderr, status = run_validator(repo).values_at(1, 2)
+
+    assert_includes stderr, "Conditions organization comes from authenticated context"
+    refute_predicate status, :success?
+  end
+
+  def test_when_condition_body_contains_org_then_validator_fails
+    body = "`POST /v1/conditions`\n```json\n{ \"org\": \"acme\", \"id\": \"checkout\" }\n```"
+    repo = build_repo("skills/customer-knowledge-curation/SKILL.md" => valid_skill(body))
+
+    stderr, status = run_validator(repo).values_at(1, 2)
+
+    assert_includes stderr, "condition bodies must not select an organization"
+    refute_predicate status, :success?
+  end
+
+  def test_current_skill_documents_complete_authenticated_v1_crud
+    body = File.read(File.join(REPO_ROOT, "skills/customer-knowledge-curation/SKILL.md"))
+    reference = File.read(File.join(REPO_ROOT, "skills/customer-knowledge-curation/references/conditions-api.md"))
+    contract = "#{body}\n#{reference}"
+
+    assert_match(%r{GET\s+/v1/conditions.*POST\s+/v1/conditions.*PUT\s+/v1/conditions/:id.*DELETE\s+/v1/conditions/:id}m, contract)
+    assert_match(/authenticated customer context/, contract)
+    refute_match(%r{/api/conditions|/v1/conditions\?org=}, contract)
   end
 
   def test_when_context_evidence_is_documented_then_validator_fails

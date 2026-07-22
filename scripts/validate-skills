@@ -24,8 +24,10 @@ class SkillValidator
     "private curator pod detail" => /curator pod/i
   }.freeze
 
-  COLLECTION_CONDITIONS_GET = /GET\s+\/api\/conditions(?:\s|`|$)/
-  CONDITIONS_PUT = /PUT\s+\/api\/conditions/
+  LEGACY_CONDITIONS_API = %r{/api/conditions}
+  V1_CONDITIONS_API = %r{/v1/conditions}
+  CONDITIONS_ORG_QUERY = %r{/v1/conditions[^\s`]*[?&]org=}
+  CONDITION_BODY_ORG = /"org"\s*:/
   UNSUPPORTED_CONTEXT_EVIDENCE = /context\.evidence|\"context\"\s*:\s*\{[^}]*\"evidence\"\s*:/m
 
   def initialize(root)
@@ -144,8 +146,13 @@ class SkillValidator
   end
 
   def validate_conditions_api_semantics(path, body)
-    add_error(path, "collection GET /api/conditions is not an authoring step") if body.match?(COLLECTION_CONDITIONS_GET)
-    add_error(path, "PUT /api/conditions is not part of this skill workflow") if body.match?(CONDITIONS_PUT)
+    add_error(path, "legacy /api/conditions is not customer-facing") if body.match?(LEGACY_CONDITIONS_API)
+    if body.match?(CONDITIONS_ORG_QUERY)
+      add_error(path, "Conditions organization comes from authenticated context")
+    end
+    if body.match?(V1_CONDITIONS_API) && body.match?(CONDITION_BODY_ORG)
+      add_error(path, "condition bodies must not select an organization")
+    end
     add_error(path, "context.evidence is not accepted by the Conditions API") if body.match?(UNSUPPORTED_CONTEXT_EVIDENCE)
   end
 

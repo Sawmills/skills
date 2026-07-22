@@ -13,20 +13,35 @@
 Use the metric Conditions API:
 
 ```http
-POST   /api/conditions
-GET    /api/conditions/:id
-DELETE /api/conditions/:id
+GET    /v1/conditions
+GET    /v1/conditions/:id
+POST   /v1/conditions
+PUT    /v1/conditions/:id
+DELETE /v1/conditions/:id
 ```
+
+The organization comes from the authenticated customer context. Never add an
+organization selector to the URL or request body.
 
 Rules:
 
-1. Create with `POST /api/conditions`.
-2. Suffix every condition id with a creation timestamp in the form
+1. Use the collection read only when explicitly inspecting or maintaining
+   existing coverage. Net-new knowledge sweeps remain independent of the
+   existing catalog.
+2. Read a specific condition before amending it. Re-verify its metric, labels,
+   grain, and threshold against live telemetry, then `PUT` the complete set of
+   editable fields to `/v1/conditions/:id`.
+3. Create with `POST /v1/conditions`. Suffix every new condition id with a
+   creation timestamp in the form
    `_HHMMDDMMYYYY`, such as `checkout_api_error_ratio_onset_093415072026`.
-3. Verify only your own writes with `GET /api/conditions/:id` or the POST
-   response.
-4. Delete only when explicitly given the id of a condition that is obsolete,
+4. Verify every create or amendment with its response or
+   `GET /v1/conditions/:id`.
+5. Delete only when explicitly given the id of a condition that is obsolete,
    invalid, or pointed at a signal that no longer exists.
+
+Responses contain server-owned fields. Do not copy them into create or amend
+bodies; rebuild the body from the documented editable fields below. The path id
+is immutable.
 
 Do not create log conditions through this surface.
 

@@ -17,15 +17,18 @@ Two sources of coverage, in priority order:
 - Live telemetry fills the gaps. Use golden signals, dependency signals, and
   metric-schema exploration to find failure modes no incumbent watches yet.
 
-Do not read the curator catalog while authoring. A skill run is an independent
-source of customer knowledge; the curator converges overlaps downstream.
+For net-new authoring, do not read the curator catalog first. A knowledge sweep
+is an independent source of coverage and the curator converges overlaps
+downstream. For explicit inspection or maintenance, read only the collection or
+condition needed for that task.
 
 1. Build the component census before authoring.
 2. Sweep the available customer sources.
 3. Verify each candidate metric, label set, grain, and threshold against live data.
 4. Author one condition per failure mode per telemetry source.
-5. Write conditions through the Conditions API.
-6. Verify only the ids you created.
+5. Create missing coverage or amend the named existing condition through the
+   Conditions API.
+6. Verify every condition you created or amended.
 7. End with covered components, named gaps, and unreadable sources.
 
 ## Required References
@@ -61,19 +64,23 @@ Read these direct references as the task requires:
 Use the metric Conditions API only. Do not create log conditions through this
 surface.
 
-- Create: `POST /api/conditions`
-- Verify own writes: `GET /api/conditions/:id`
-- Delete: `DELETE /api/conditions/:id` only when explicitly given an obsolete,
-  invalid, or stale condition id.
+- List for explicit inspection or maintenance: `GET /v1/conditions`
+- Read: `GET /v1/conditions/:id`
+- Create: `POST /v1/conditions`
+- Amend: `PUT /v1/conditions/:id`
+- Delete: `DELETE /v1/conditions/:id` only when explicitly given an obsolete,
+  invalid, or stale condition id
 
-Do not use collection reads as an authoring step, and do not amend existing
-coverage with `PUT`; the curator owns convergence and maintenance.
+The organization comes from the authenticated customer context. Never send an
+organization selector in the URL or condition body. Before an amendment, read
+the current condition, re-verify its live signal, preserve intentionally
+unchanged editable fields, and verify the write response.
 
 ## Safety
 
-Customer systems are read-only. The only normal mutation is writing metric
-conditions to the curator API, and deletion only when explicitly instructed with
-an id.
+Customer systems are read-only. The only normal mutations are creating or
+amending metric conditions through the curator API, and deletion only when
+explicitly instructed with an id.
 
 Bound exploratory queries before grouping over high-cardinality dimensions.
 Never invent customer context, source names, labels, incidents, runbooks, or
