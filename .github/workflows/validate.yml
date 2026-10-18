@@ -8,7 +8,7 @@ on:
 
 jobs:
   validate-skills:
-    runs-on: ubuntu-latest
+    runs-on: namespace-profile-sawmills-runner
     steps:
       - uses: actions/checkout@v4
       - uses: ruby/setup-ruby@v1
